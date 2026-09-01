@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GesturePresenter AI - Interactive Flask Presentation App</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Application Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- MediaPipe Hands & Camera Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+
+<body>
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+        <div class="brand">
+            <div class="brand-logo">🖐</div>
+            <div class="brand-info">
+                <span class="brand-title">GesturePresenter AI</span>
+                <span class="brand-subtitle">Interactive Hand Gesture Presentation System</span>
+            </div>
+        </div>
+
+        <!-- Presentation Info Bar -->
+        <div class="presentation-info">
+            <span class="pres-title" id="presTitle">Gesture Control Demo Presentation</span>
+            <span class="pres-badge" id="slideCounterBadge">Slide 1 / 5</span>
+        </div>
+
+        <div class="nav-actions">
+            <!-- Sound FX Toggle -->
+            <button id="soundFxBtn" class="btn" title="Toggle Sound FX Audio">
+                <span>🔊</span> <span id="soundFxText">Sound ON</span>
+            </button>
+
+            <!-- Start Camera Button -->
+            <button id="toggleCamBtn" class="btn btn-primary">
+                <span>📹</span> <span id="camBtnText">Start Camera</span>
+            </button>
+
+            <!-- Upload Presentation Button -->
+            <button id="uploadModalBtn" class="btn btn-success">
+                <span>📁</span> Upload Deck
+            </button>
+
+            <button id="resetDemoBtn" class="btn">
+                <span>🔄</span> Demo Deck
+            </button>
+
+            <button id="fullscreenBtn" class="btn">
+                <span>🖥️</span> Fullscreen
+            </button>
+
+            <button id="helpModalBtn" class="btn">
+                <span>❓</span> Gestures
+            </button>
+        </div>
+    </header>
+
+    <!-- Interactive Sub-Header Toolbar -->
+    <div class="interactive-toolbar">
+        <!-- Live Presentation Timer -->
+        <div class="timer-widget">
+            <span class="timer-icon">⏱️</span>
+            <span class="timer-display" id="timerDisplay">00:00</span>
+            <button id="timerToggleBtn" class="btn-icon-sm" title="Start / Pause Timer">▶️</button>
+            <button id="timerResetBtn" class="btn-icon-sm" title="Reset Timer">🔄</button>
+        </div>
+
+        <!-- Drawing Annotations Controls -->
+        <div class="drawing-controls">
+            <button id="drawModeBtn" class="btn btn-sm">
+                <span>✏️</span> Live Draw: <strong id="drawModeStatus">OFF</strong>
+            </button>
+            <div class="color-palette" id="colorPalette">
+                <div class="color-pill active" data-color="#ef4444" style="background: #ef4444;" title="Laser Red">
+                </div>
+                <div class="color-pill" data-color="#10b981" style="background: #10b981;" title="Emerald Green"></div>
+                <div class="color-pill" data-color="#f59e0b" style="background: #f59e0b;" title="Electric Yellow"></div>
+                <div class="color-pill" data-color="#6366f1" style="background: #6366f1;" title="Indigo Blue"></div>
+                <div class="color-pill" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan"></div>
+            </div>
+            <button id="clearCanvasBtn" class="btn btn-sm btn-danger">
+                <span>🗑️</span> Clear Notes
+            </button>
+        </div>
+
+        <!-- Interactive Floating Reactions Bar -->
+        <div class="reactions-bar">
+            <span class="reactions-title">Live Audience Reactions:</span>
+            <button class="reaction-btn" data-emoji="❤️">❤️</button>
+            <button class="reaction-btn" data-emoji="🔥">🔥</button>
+            <button class="reaction-btn" data-emoji="👏">👏</button>
+            <button class="reaction-btn" data-emoji="🎉">🎉</button>
+            <button class="reaction-btn" data-emoji="🚀">🚀</button>
+            <button class="reaction-btn" data-emoji="💡">💡</button>
+        </div>
+    </div>
+
+    <!-- Main Presentation Viewport Stage -->
+    <main class="main-stage">
+        <div class="viewport-container" id="viewportContainer">
+            <!-- Slide Image Viewport -->
+            <img id="slideImage" class="slide-image" src="" alt="Presentation Slide">
+
+            <!-- Interactive On-Slide Drawing Canvas Overlay -->
+            <canvas id="drawingCanvas" class="drawing-canvas"></canvas>
+
+            <!-- Floating Reaction Particles Container -->
+            <div id="particlesContainer" class="particles-container"></div>
+
+            <!-- Virtual Laser Pointer Overlay Dot -->
+            <div id="laserDot" class="laser-dot" style="display: none; top: 50%; left: 50%;"></div>
+
+            <!-- Gesture HUD Badge Overlay -->
+            <div class="gesture-hud" id="gestureHUD">
+                <div class="hud-icon" id="hudIcon">🖐</div>
+                <div class="hud-details">
+                    <span class="hud-label-small">Detected Gesture</span>
+                    <span class="hud-gesture-name" id="hudGestureName">Camera Off</span>
+                </div>
+            </div>
+
+            <!-- Floating PIP Webcam Card -->
+            <div class="webcam-pip">
+                <div class="pip-header">
+                    <span>Webcam Hand Tracking</span>
+                    <span class="pip-status-dot" id="pipStatusDot"></span>
+                </div>
+                <video id="webcamVideo" playsinline muted></video>
+                <canvas id="handCanvas"></canvas>
+            </div>
+
+            <!-- Stage Navigation Arrow Overlays -->
+            <button class="stage-arrow arrow-left" id="prevSlideBtn" title="Previous Slide (Left Arrow)">
+                ❮
+            </button>
+            <button class="stage-arrow arrow-right" id="nextSlideBtn" title="Next Slide (Right Arrow)">
+                ❯
+            </button>
+
+            <!-- Action Toast Alert -->
+            <div class="action-toast" id="actionToast" style="display: none;">
+                <span id="toastMsg">👉 Next Slide</span>
+            </div>
+        </div>
+
+        <!-- Slide Thumbnails Bar Carousel -->
+        <div class="thumbnails-bar" id="thumbnailsBar">
+            <!-- Dynamically populated thumbnail items -->
+        </div>
+    </main>
+
+    <!-- Presentation Upload Modal -->
+    <div class="modal-overlay" id="uploadModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>📁 Upload Presentation</h2>
+                <button class="modal-close" id="closeUploadModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="dropzone" id="dropzone">
+                    <div class="dropzone-icon">📄</div>
+                    <div class="dropzone-title">Click to Select or Drag & Drop File</div>
+                    <div class="dropzone-sub">Supports PowerPoint (.pptx) & PDF (.pdf) up to 32MB</div>
+                    <input type="file" id="fileInput" accept=".pdf,.pptx,.ppt" style="display: none;">
+                </div>
+                <div id="uploadStatus" style="margin-top: 14px; text-align: center; display: none;">
+                    <span id="uploadStatusText">Converting slides... Please wait.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gesture Cheatsheet Help Modal -->
+    <div class="modal-overlay" id="helpModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>🖐 Hand Gesture Controls Guide</h2>
+                <button class="modal-close" id="closeHelpModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="cheatsheet-grid">
+                    <div class="cheat-card">
+                        <span class="cheat-icon">👉</span>
+                        <div>
+                            <div class="cheat-title">Next Slide</div>
+                            <div class="cheat-desc">Point / Swipe hand right</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">👈</span>
+                        <div>
+                            <div class="cheat-title">Previous Slide</div>
+                            <div class="cheat-desc">Point / Swipe hand left</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">☝</span>
+                        <div>
+                            <div class="cheat-title">Laser Pointer</div>
+                            <div class="cheat-desc">Raise index finger to point laser</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">👌</span>
+                        <div>
+                            <div class="cheat-title">Pinch Draw</div>
+                            <div class="cheat-desc">Pinch index & thumb to draw notes</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">✌️</span>
+                        <div>
+                            <div class="cheat-title">Victory Confetti</div>
+                            <div class="cheat-desc">Victory V-sign triggers confetti blast</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">👍</span>
+                        <div>
+                            <div class="cheat-title">Thumbs Up</div>
+                            <div class="cheat-desc">Thumbs up fires reaction emojis</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">✊</span>
+                        <div>
+                            <div class="cheat-title">Closed Fist</div>
+                            <div class="cheat-desc">Closed fist clears drawing notes</div>
+                        </div>
+                    </div>
+                    <div class="cheat-card">
+                        <span class="cheat-icon">🖐</span>
+                        <div>
+                            <div class="cheat-title">Open Palm</div>
+                            <div class="cheat-desc">Open palm holds gesture state</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Scripts -->
+    <script src="{{ url_for('static', filename='js/gesture_engine.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>
